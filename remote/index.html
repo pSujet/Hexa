@@ -76,6 +76,30 @@
 						data: "stop"
 					})
 				}
+				document.getElementById('Up').onclick = function () {
+					robot.sendData({
+						skillID: skillID,
+						data: "Up"
+					})
+				}
+				document.getElementById('Down').onclick = function () {
+					robot.sendData({
+						skillID: skillID,
+						data: "Down"
+					})
+				}
+				document.getElementById('Left').onclick = function () {
+					robot.sendData({
+						skillID: skillID,
+						data: "Left"
+					})
+				}
+				document.getElementById('Right').onclick = function () {
+					robot.sendData({
+						skillID: skillID,
+						data: "Right"
+					})
+				}
 			}
 		});
 	</script>
@@ -96,9 +120,16 @@
 	Angle<br>
 	<button id="CCW">CCW</button>
 	<button id="CW">CW</button><br><br>
+	Height<br>
+	<button id="Up">Up</button>
+	<button id="Down">Down</button><br><br>
 	Moving<br>
 	<button id="start">Start</button>
-	<button id="stop">Stop</button>
+	<button id="stop">Stop</button><br><br>
+	Side Walk<br>
+	<button id="Left">Left</button>
+	<button id="Right">Right</button><br><br>
+
 </body>
 
 </html>

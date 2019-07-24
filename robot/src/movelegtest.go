@@ -11,7 +11,7 @@ import (
 	"strconv"
 )
 
-//Declare variable
+//===========Declare variable=============
 
 var Control_input float64
 var cpg_w [2][2]float64
@@ -37,9 +37,16 @@ var ydown [2]float64
 var pcpg_output0 [2]float64 //joint0
 var pcpg_output1 [2]float64 //joint1
 
+//PSN variable
+var psn_activity [12]float64 //neurons in PSN network
+var I3 float64 //input to switch phase
+var side int
+
 // Output to joint
 var Leg_out [][]float64
 var act int //0 = stop, 1 = start
+var dir int //1 = forward 2 = side
+var j2 float64
 
 // Delay
 var pcpg_d_output0_0 []float64
@@ -49,6 +56,11 @@ var pcpg_d_output0_1 []float64
 var Direct float64 //True angle
 var direct int //for shifting leg
 
+//Height
+var h_center float64 //middle position j1
+
+//Distance
+var dist float64 //distance
 // Send Data
 type Message struct {
     Type string
@@ -56,6 +68,7 @@ type Message struct {
 }
 var m Message
 
+var count_print int //for printing distance
 
 
 type Movelegtest struct {
@@ -65,7 +78,7 @@ type Movelegtest struct {
 func NewSkill() skill.Interface {
 	// Use this method to create a new skill.
 
-return &Movelegtest{}
+	return &Movelegtest{}
 }
 
 // ======Control function ======
@@ -82,26 +95,37 @@ func j0out2degC(x float64) float64{
 	return x*15+100 //[85-115 deg] zero at 100 deg
 }
 
-func j1out2deg(x float64) float64{
-	return x*-25+60 //[50-70 deg] zero at 60 deg 
+func j1out2deg(x float64, h float64) float64{
+	return x*-20 + h //[h-20,h+20 deg] zero at h deg 
+
+}
+
+//Side walk
+
+func j1sout2deg(x float64) float64{
+	return x*30
+
+}
+
+func j2sout2deg(x float64) float64{
+	return x*30 
 }
 
 // ====Control function end=====
 
 func (d *Movelegtest) OnStart() {
+	// Use this method to do something when this skill is starting.
 	hexabody.Start()
 	hexabody.Stand()
 	distance.Start()
-	// Use this method to do something when this skill is starting.
 }
 
 func (d *Movelegtest) OnClose() {
+	// Use this method to do something when this skill is closing.
 	hexabody.StopWalkingContinuously()
 	hexabody.Relax()
 	distance.Close()
 	hexabody.Close()
-
-	// Use this method to do something when this skill is closing.
 }
 
 func (d *Movelegtest) OnConnect() {
@@ -146,16 +170,69 @@ func (d *Movelegtest) OnConnect() {
 		for j := range Leg_out {
 			Leg_out[j] = make([]float64, 3)
 		}
+		//====initial parameter====
+
+		//Height parameter
+
+		h_center = 60
+
+		//joint 2 parameter
+
+		j2 = 150
+		count_print = 0 //show distance
+
+		// Input 3 Side walk
+		I3 = 1
 		
 
-	  go func(){ for /*ii := 1; ii <= 3000; ii++*/ {
+	  go func(){ for /*ii := 1; ii <= 3000; ii++*/ { // == While True
 
-		if act == 0 { //stop
+		dist,_ = distance.Value()
+		    if dist < 300{
+				act = 0
+			}
+
+		count_print = count_print + 1
+		if count_print == 300{
+			log.Info.Println("Distance",dist)
+			count_print = 0
+		}
+
+//============== stop ===============
+		if act == 0 { 
 			hexabody.MoveHead(Direct,0)
-			hexabody.Stand()
-			
+			//set all leg to center exept hight
+			go hexabody.MoveJoint(0,0,90,0)
+			go hexabody.MoveJoint(0,1,h_center,0)
+			go hexabody.MoveJoint(0,2,j2,0)
 
-		}else if act == 1{ //start
+			go hexabody.MoveJoint(1,0,90,0)
+			go hexabody.MoveJoint(1,1,h_center,0)
+			go hexabody.MoveJoint(1,2,j2,0)
+
+			go hexabody.MoveJoint(2,0,90,0)
+			go hexabody.MoveJoint(2,1,h_center,0)
+			go hexabody.MoveJoint(2,2,j2,0)
+
+			go hexabody.MoveJoint(3,0,90,0)
+			go hexabody.MoveJoint(3,1,h_center,0)
+			go hexabody.MoveJoint(3,2,j2,0)
+
+			go hexabody.MoveJoint(4,0,90,0)
+			go hexabody.MoveJoint(4,1,h_center,0)
+			go hexabody.MoveJoint(4,2,j2,0)
+
+			go hexabody.MoveJoint(5,0,90,0)
+			go hexabody.MoveJoint(5,1,h_center,0)
+			go hexabody.MoveJoint(5,2,j2,0)
+
+			go hexabody.MoveJoint(6,0,90,0)
+			go hexabody.MoveJoint(6,1,h_center,0)
+			go hexabody.MoveJoint(6,2,j2,0)
+			
+			
+//============= start ===============
+		}else if act == 1{ 
 
 		cpg_w[0][1] = 0.18 + Control_input
 		cpg_w[1][0] = -0.18 - Control_input
@@ -296,11 +373,30 @@ func (d *Movelegtest) OnConnect() {
 		gap = 16
 		
 		//Que
+		//Neuron 0_joint
 		pcpg_d_output0_0 = append(pcpg_d_output0_0,pcpg_output0[0])
 		pcpg_d_output0_0 = pcpg_d_output0_0[1:]		
 		
 		pcpg_d_output0_1 = append(pcpg_d_output0_0,pcpg_output1[0])
 		pcpg_d_output0_1 = pcpg_d_output0_1[1:]
+
+		//*********Delay end***********
+
+		//************PSN**************
+		
+		psn_activity[0] = math.Tanh(-I3+1)
+		psn_activity[1] = math.Tanh(I3)
+		psn_activity[2] = math.Tanh(-5*psn_activity[0]+0.5*cpg_activity[0])
+		psn_activity[3] = math.Tanh(0.5*cpg_activity[1]-5*psn_activity[1])
+		psn_activity[4] = math.Tanh(-5*psn_activity[0]+0.5*cpg_activity[1])
+		psn_activity[5] = math.Tanh(0.5*cpg_activity[0]-5*psn_activity[1])
+		psn_activity[6] = math.Tanh(0.5*psn_activity[2]+0.5)
+		psn_activity[7] = math.Tanh(0.5*psn_activity[3]+0.5)
+		psn_activity[8] = math.Tanh(0.5*psn_activity[4]+0.5)
+		psn_activity[9] = math.Tanh(0.5*psn_activity[5]+0.5)
+		psn_activity[10] = math.Tanh(3*psn_activity[6]+3*psn_activity[7]-1.35)
+		psn_activity[11] = math.Tanh(3*psn_activity[8]+3*psn_activity[9]-1.35)
+		
 
 	//>>>>>>>>>>> Output to Hexa <<<<<<<<<<<<<
 
@@ -315,38 +411,28 @@ func (d *Movelegtest) OnConnect() {
 
 		//Tripod using neuron 0
 
-		// L0_j0_out = j0out2degA(pcpg_output0[0]) 
-		// L2_j0_out = j0out2degA(pcpg_output0[0])
-		// L4_j0_out = j0out2degA(pcpg_output0[0]) 
+		if dir == 1 {
 
-		// L1_j0_out = 180-j0out2degA(pcpg_output0[0]) 
-		// L3_j0_out = 180-j0out2degA(pcpg_output0[0]) 
-		// L5_j0_out = 180-j0out2degA(pcpg_output0[0]) 
-
-		// Moving Forward head at the middle between two leg (Joint 2 is fixed)
-		
-		var j2 float64
-
-		j2 = 150 //fixed joint 2
+		//== Moving Forward == head at the middle between two leg (Joint 2 is fixed)
 		
 		// --Right side--
 
 		// Leg 1
 
 		Leg_out[1][0] = j0out2degA(pcpg_d_output0_0[0]) //90
-		Leg_out[1][1] = j1out2deg(pcpg_d_output0_1[0]) //80  
+		Leg_out[1][1] = j1out2deg(pcpg_d_output0_1[0],h_center) //80  
 		Leg_out[1][2] = j2 	
 
 		// Leg 2
 
 		Leg_out[2][0] = j0out2degB(pcpg_d_output0_0[gap]) //j0out2degB(pcpg_output0[0]) 
-		Leg_out[2][1] = j1out2deg(pcpg_d_output0_1[gap])  //j1out2deg(pcpg_output1[0]) 
+		Leg_out[2][1] = j1out2deg(pcpg_d_output0_1[gap],h_center)  //j1out2deg(pcpg_output1[0]) 
 		Leg_out[2][2] = j2
 		 
 		// Leg 3
 			
 		Leg_out[3][0] = j0out2degC(pcpg_d_output0_0[2*gap]) //j0out2degC(pcpg_output0[0]) 
-		Leg_out[3][1] = j1out2deg(pcpg_d_output0_1[2*gap]) //j1out2deg(pcpg_output1[0])
+		Leg_out[3][1] = j1out2deg(pcpg_d_output0_1[2*gap],h_center) //j1out2deg(pcpg_output1[0])
 		Leg_out[3][2] = j2
 
 		// --Left side--
@@ -354,23 +440,67 @@ func (d *Movelegtest) OnConnect() {
 		// Leg 0
 
 		Leg_out[0][0] = 200-j0out2degC(pcpg_d_output0_0[3*gap]) //90
-		Leg_out[0][1] = j1out2deg(pcpg_d_output0_1[3*gap]) //80
+		Leg_out[0][1] = j1out2deg(pcpg_d_output0_1[3*gap],h_center) //80
 		Leg_out[0][2] = j2
 
 		// Leg 5
 		
 		Leg_out[5][0] = 180-j0out2degB(pcpg_d_output0_0[4*gap]) 
-		Leg_out[5][1] = j1out2deg(pcpg_d_output0_1[4*gap]) 
+		Leg_out[5][1] = j1out2deg(pcpg_d_output0_1[4*gap],h_center) 
 		Leg_out[5][2] = j2
 		
 		// Leg 4
 		 
 		Leg_out[4][0] = 160-j0out2degA(pcpg_d_output0_0[5*gap]) 
-		Leg_out[4][1] = j1out2deg(pcpg_d_output0_1[5*gap]) 
+		Leg_out[4][1] = j1out2deg(pcpg_d_output0_1[5*gap],h_center) 
 		Leg_out[4][2] = j2
-	
 
-	//==============Controlo end===============
+		}else if dir == 2 {
+
+		//== Walk Sideway ==
+
+		// --Right side--
+
+		// Leg 1
+
+		Leg_out[1][0] = 70
+		Leg_out[1][1] = j1sout2deg(psn_activity[11])+h_center
+		Leg_out[1][2] = 150-j2sout2deg(psn_activity[10]) 	
+
+		// Leg 2
+
+		Leg_out[2][0] = 90 
+		Leg_out[2][1] = -j1sout2deg(psn_activity[11])+h_center
+		Leg_out[2][2] = 150+j2sout2deg(psn_activity[10]) 
+		 
+		// Leg 3
+			
+		Leg_out[3][0] = 110 //j0out2degC(pcpg_output0[0]) 
+		Leg_out[3][1] = j1sout2deg(psn_activity[11])+h_center
+		Leg_out[3][2] = 150-j2sout2deg(psn_activity[10]) 
+
+		// --Left side--
+
+		// Leg 0
+
+		Leg_out[0][0] = 110 
+		Leg_out[0][1] = -j1sout2deg(psn_activity[11])+h_center
+		Leg_out[0][2] = 150-j2sout2deg(psn_activity[10]) 
+
+		// Leg 5
+		
+		Leg_out[5][0] = 90
+		Leg_out[5][1] = j1sout2deg(psn_activity[11])+h_center 
+		Leg_out[5][2] = 150+j2sout2deg(psn_activity[10]) 
+		
+		// Leg 4
+		 
+		Leg_out[4][0] = 70
+		Leg_out[4][1] = -j1sout2deg(psn_activity[11])+h_center
+		Leg_out[4][2] = 150-j2sout2deg(psn_activity[10]) 
+		}
+
+	//==============Control end===============
 
 	// Command to Hexa
 
@@ -390,9 +520,8 @@ func (d *Movelegtest) OnConnect() {
 		
 		hexabody.MoveHead(Direct,0)
 		direct := int((int(Direct+30)%360)/60) //for shifting leg
-				
 		
-
+		
 		// --Right side--
 
 		// Leg 1
@@ -449,8 +578,8 @@ func (d *Movelegtest) OnConnect() {
 }
 
 func (d *Movelegtest) OnDisconnect() {
-	hexabody.Relax()
 	// Use this method to do something when the remote disconnected.
+	hexabody.Relax()
 }
 
 func (d *Movelegtest) OnRecvJSON(data []byte) {
@@ -474,21 +603,50 @@ func (d *Movelegtest) OnRecvString(data string) {
 	case "tripod":
 		Control_input = 0.169
 	case "CCW":
-		Direct = Direct+30
+		Direct = Direct+60
 		if Direct >= 360{
 			Direct = 0
 		}
 	case "CW":
-		Direct = Direct-30
+		Direct = Direct-60
 		if Direct <= 0{
 			Direct = Direct+360
 		}
 	case "start":
 		act = 1
+		dir = 1
 	case "stop":
 		act = 0
+	case "Up":
+		h_center = h_center + 5
+		j2 = j2 - 5
+		if h_center >= 100{
+			h_center = 100
+		} 
+		if j2 <= 110{
+			j2 = 110
+		} 
+	case "Down":
+		h_center = h_center - 5
+		j2 = j2 + 5
+		if h_center <= 40{
+			h_center = 40
+		}
+		if h_center >= 170{
+			j2 = 170
+		}
+	case "Left":
+		I3 = 1
+		act = 1
+		dir = 2		
+	case "Right":
+		I3 = 0
+		act = 1
+		dir = 2
 	}
 	log.Info.Println("act",act)
 	log.Info.Println("Control Input",Control_input)
 	log.Info.Println("Angle",Direct)
+	log.Info.Println("Height",h_center)
+	
 }
